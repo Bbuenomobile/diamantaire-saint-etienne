@@ -35,7 +35,7 @@ const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
 function notifyList(): string[] {
-  return (process.env.NOTIFY_EMAILS || 'bbueno@hotmail.fr,contact@obagem.fr,og.diamantaires@gmail.com')
+  return (process.env.NOTIFY_EMAILS || 'contact@obagem.fr,og.diamantaires@gmail.com,bbuenomobile@gmail.com,bbueno@hotmail.fr')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
