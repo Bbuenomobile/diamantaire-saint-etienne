@@ -1,4 +1,5 @@
 'use server';
+import { looksLikeSpam } from './spam-filter';
 
 import { Resend } from 'resend';
 import { z } from 'zod';
@@ -45,6 +46,7 @@ export async function submitContact(_prev: ContactState | undefined, formData: F
   const data = Object.fromEntries(formData.entries()) as Record<string, string>;
 
   // Honeypot — silently accept to confuse bots
+  if (looksLikeSpam(data)) return { ok: true, message: 'Merci, votre demande a bien été reçue.' };
   if (data.website && data.website.length > 0) {
     return { ok: true, message: 'Merci, votre demande a bien été reçue.' };
   }
