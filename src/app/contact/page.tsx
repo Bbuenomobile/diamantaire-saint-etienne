@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
-import Script from 'next/script';
 import { ContactForm } from '@/components/contact-form';
 import { Section, SectionHeading } from '@/components/section';
 import { site } from '@/lib/site';
@@ -41,7 +40,7 @@ export default function Page() {
             <div className="card p-6">
               <p className="label">Téléphone</p>
               <a href={`tel:${site.phone.replace(/\s/g, '')}`} className="mt-2 block font-display text-3xl text-ink-900 hover:text-gold-700">{site.phoneDisplay}</a>
-              <p className="mt-2 text-sm text-ink-600">Du lundi au samedi, 10 h – 19 h.</p>
+              <p className="mt-2 text-sm text-ink-600">Du lundi au vendredi, 10 h – 13 h et 14 h – 18 h 30.</p>
             </div>
             <div className="card p-6">
               <p className="label">Email</p>
@@ -60,8 +59,10 @@ export default function Page() {
                 {site.hours.map((h) => (
                   <li key={h.day} className="flex justify-between text-ink-700">
                     <span>{h.day}</span>
-                    <span className={h.open === 'Fermé' ? 'text-ink-400' : ''}>
-                      {h.open === 'Fermé' ? 'Fermé' : `${h.open} – ${h.close}`}
+                    <span className={h.ranges.length === 0 ? 'text-ink-400' : ''}>
+                      {h.ranges.length === 0
+                        ? 'Fermé'
+                        : h.ranges.map((r) => `${r[0]} – ${r[1]}`).join(' · ')}
                     </span>
                   </li>
                 ))}
@@ -97,7 +98,7 @@ export default function Page() {
         </div>
       </Section>
 
-      <Script id="ld-contact" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(businessJsonLd) }} />
+      <script id="ld-contact" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(businessJsonLd) }} />
     </>
   );
 }

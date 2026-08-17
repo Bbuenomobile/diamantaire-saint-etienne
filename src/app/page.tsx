@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
-import Script from 'next/script';
 import { ContactForm } from '@/components/contact-form';
 import { Section, SectionHeading } from '@/components/section';
 import { ServiceCard } from '@/components/service-card';
@@ -411,7 +410,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <Script id="ld-faq" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+      <script id="ld-faq" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
     </>
   );
 }

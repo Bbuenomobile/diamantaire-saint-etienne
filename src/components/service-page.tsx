@@ -1,6 +1,5 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import Script from 'next/script';
 import { ContactForm } from '@/components/contact-form';
 import { Section, SectionHeading } from '@/components/section';
 import { TrustBar } from '@/components/trust-bar';
@@ -236,8 +235,8 @@ export function ServicePage(p: ServicePageProps) {
         </div>
       </section>
 
-      <Script id={`ld-faq-${p.slug}`} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
-      <Script id={`ld-bc-${p.slug}`} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <script id={`ld-faq-${p.slug}`} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+      <script id={`ld-bc-${p.slug}`} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
     </>
   );
 }

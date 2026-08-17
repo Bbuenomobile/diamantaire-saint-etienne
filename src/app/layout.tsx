@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import { Cormorant_Garamond, Inter } from 'next/font/google';
-import Script from 'next/script';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { StickyCTA } from '@/components/sticky-cta';
@@ -121,15 +120,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       { '@type': 'AdministrativeArea', name: 'Loire' },
       { '@type': 'AdministrativeArea', name: 'Auvergne-Rhône-Alpes' },
     ],
-    openingHoursSpecification: site.hours
-      .filter((h) => h.open !== 'Fermé')
-      .map((h) => ({
+    openingHoursSpecification: site.hours.flatMap((h) =>
+      h.ranges.map((r) => ({
         '@type': 'OpeningHoursSpecification',
         dayOfWeek: h.day,
-        opens: h.open,
-        closes: h.close,
+        opens: r[0],
+        closes: r[1],
       })),
-    sameAs: [site.social.instagram, site.social.facebook],
+    ),
+    sameAs: [site.social.facebook, site.social.google],
   };
 
   return (
@@ -145,7 +144,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main id="main">{children}</main>
         <Footer />
         <StickyCTA />
-        <Script
+        <script
           id="ld-business"
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd) }}

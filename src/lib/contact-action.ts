@@ -42,6 +42,53 @@ function notifyList(): string[] {
     .filter(Boolean);
 }
 
+
+/** Pieces jointes : photos, certificats PDF, videos. Sans photo, pas de pre-estimation serieuse. */
+const MAX_FICHIERS = 6;
+const MAX_OCTETS = 8 * 1024 * 1024;
+const MAX_TOTAL = 22 * 1024 * 1024;
+const TYPES_OK = /^(image\/|application\/pdf$|video\/(mp4|quicktime)$)/;
+
+type PieceJointe = { filename: string; content: string; estImage: boolean; cid: string };
+
+async function lireFichiers(formData: FormData): Promise<{ pieces: PieceJointe[]; refus: string[] }> {
+  const bruts = formData.getAll('fichiers').filter((f): f is File => f instanceof File && f.size > 0);
+  const pieces: PieceJointe[] = [];
+  const refus: string[] = [];
+  let total = 0;
+
+  for (const f of bruts.slice(0, MAX_FICHIERS)) {
+    const nom = f.name.replace(/[^\w.\-() ]+/g, '_').slice(0, 120) || 'piece-jointe';
+    if (f.size > MAX_OCTETS) {
+      refus.push(`${nom} (trop volumineux)`);
+      continue;
+    }
+    // le navigateur laisse parfois le type vide pour les HEIC : on se rabat sur l'extension
+    const type = f.type || (/\.(heic|heif)$/i.test(nom) ? 'image/heic' : '');
+    if (!TYPES_OK.test(type)) {
+      refus.push(`${nom} (format non accepté)`);
+      continue;
+    }
+    if (total + f.size > MAX_TOTAL) {
+      refus.push(`${nom} (limite globale atteinte)`);
+      continue;
+    }
+    total += f.size;
+    const b64 = Buffer.from(await f.arrayBuffer()).toString('base64');
+    pieces.push({
+      filename: nom,
+      content: b64,
+      // les HEIC ne s'affichent pas dans la plupart des messageries : jointes, pas integrees
+      estImage: /^image\//.test(type) && !/heic|heif/i.test(type),
+      cid: `piece${pieces.length + 1}`,
+    });
+  }
+  if (bruts.length > MAX_FICHIERS) {
+    refus.push(`${bruts.length - MAX_FICHIERS} fichier(s) au-delà de la limite de ${MAX_FICHIERS}`);
+  }
+  return { pieces, refus };
+}
+
 export async function submitContact(_prev: ContactState | undefined, formData: FormData): Promise<ContactState> {
   const data = Object.fromEntries(formData.entries()) as Record<string, string>;
 
@@ -62,6 +109,7 @@ export async function submitContact(_prev: ContactState | undefined, formData: F
   }
 
   const v = parsed.data;
+  const { pieces, refus } = await lireFichiers(formData);
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM || 'Diamantaire Saint-Étienne <contact@obagem.luxe>';
   const recipients = notifyList();
@@ -104,6 +152,7 @@ export async function submitContact(_prev: ContactState | undefined, formData: F
           <table style="border-collapse:collapse;width:100%;font-size:14px;">${htmlRows}</table>
           <h3 style="margin:18px 0 6px;font-family:'Cormorant Garamond',Georgia,serif;color:#0c0b09;">Message</h3>
           <div style="white-space:pre-wrap;color:#3f3b30;line-height:1.55;background:#faf8f3;border:1px solid #ecebe5;border-radius:10px;padding:14px;">${escapeHtml(v.message)}</div>
+          ${pieces.length ? `<h3 style="margin:18px 0 6px;font-family:'Cormorant Garamond',Georgia,serif;color:#0c0b09;">Pièces jointes (${pieces.length})</h3><div style="display:block">${pieces.map((p) => p.estImage ? `<img src="cid:${p.cid}" alt="${p.filename}" style="max-width:260px;border-radius:8px;border:1px solid #ecebe5;margin:0 8px 8px 0;vertical-align:top" />` : `<div style="display:inline-block;padding:8px 12px;background:#faf8f3;border:1px solid #ecebe5;border-radius:8px;margin:0 8px 8px 0;font-size:13px">📎 ${p.filename}</div>`).join('')}</div>` : ''}${refus.length ? `<p style="margin-top:10px;font-size:12px;color:#a0403f">Fichiers écartés : ${refus.join(', ')}</p>` : ''}
           <div style="margin-top:18px;font-size:12px;color:#8c8675;">Envoyé depuis ${escapeHtml(v.source)} — ${new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}</div>
         </div>
       </div>
@@ -114,13 +163,14 @@ export async function submitContact(_prev: ContactState | undefined, formData: F
     const result = await resend.emails.send({
       from,
       to: recipients,
+      attachments: pieces.map((p) => ({ filename: p.filename, content: p.content, content_id: p.cid })),
       replyTo: v.email,
       subject,
       html,
       text: rows
         .filter(([, val]) => val && String(val).trim().length > 0)
         .map(([k, val]) => `${k}: ${val}`)
-        .join('\n') + `\n\nMessage:\n${v.message}`,
+        .join('\n') + `\n\nMessage:\n${v.message}` + (pieces.length ? `\n\nPièces jointes : ${pieces.map((p) => p.filename).join(', ')}` : ''),
     });
 
     if ('error' in result && result.error) {

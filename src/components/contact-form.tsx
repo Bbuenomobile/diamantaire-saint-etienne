@@ -1,7 +1,8 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { submitContact, type ContactState } from '@/lib/contact-action';
+import { compresserImages, formaterMo } from '@/lib/compresser-images';
 
 type Props = {
   variant?: 'compact' | 'full' | 'estimation';
@@ -25,6 +26,61 @@ export function ContactForm({
   intro,
 }: Props) {
   const [state, action, pending] = useActionState(submitContact, initial);
+
+  const [fichiersInfo, setFichiersInfo] = useState('');
+  const [fichiersErreur, setFichiersErreur] = useState(false);
+
+  const MAX_FICHIERS = 6;
+  const MAX_OCTETS = 8 * 1024 * 1024;
+const MAX_TOTAL = 22 * 1024 * 1024;
+
+  async function onFichiers(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    const liste = Array.from(input.files ?? []);
+    if (liste.length === 0) {
+      setFichiersInfo('');
+      setFichiersErreur(false);
+      return;
+    }
+
+    // On ecarte seulement le surplus au lieu de vider toute la selection :
+    // un fichier en trop ne doit pas faire perdre les autres photos.
+    const retenus = liste.slice(0, MAX_FICHIERS);
+    const ecartes = liste.length - retenus.length;
+
+    setFichiersErreur(false);
+    setFichiersInfo('Préparation des photos…');
+
+    const { fichiers, octetsAvant, octetsApres, compresses } = await compresserImages(retenus);
+
+    const gardes: File[] = [];
+    const refuses: string[] = [];
+    let cumul = 0;
+    for (const x of fichiers) {
+      if (x.size > MAX_OCTETS) { refuses.push(x.name); continue; }
+      if (cumul + x.size > MAX_TOTAL) { refuses.push(x.name); continue; }
+      cumul += x.size;
+      gardes.push(x);
+    }
+
+    // le formulaire est soumis via action={} : on remplace les fichiers de l'input
+    // par leurs versions compressees pour que ce soit elles qui partent.
+    try {
+      const dt = new DataTransfer();
+      for (const x of gardes) dt.items.add(x);
+      input.files = dt.files;
+    } catch {
+      /* navigateur sans DataTransfer : les originaux seront envoyes, le serveur tranchera */
+    }
+
+    const bouts: string[] = [`${gardes.length} fichier${gardes.length > 1 ? 's' : ''} prêt${gardes.length > 1 ? 's' : ''} · ${formaterMo(cumul)}`];
+    if (compresses > 0) bouts.push(`photos optimisées : ${formaterMo(octetsAvant)} → ${formaterMo(octetsApres)}`);
+    if (ecartes > 0) bouts.push(`${ecartes} au-delà de ${MAX_FICHIERS} non retenu${ecartes > 1 ? 's' : ''}`);
+    if (refuses.length) bouts.push(`trop volumineux même après optimisation : ${refuses.join(', ')}`);
+    setFichiersErreur(gardes.length === 0);
+    setFichiersInfo(bouts.join(' · '));
+  }
+
 
   if (state.ok) {
     return (
@@ -118,6 +174,36 @@ export function ContactForm({
           )}
         </>
       )}
+
+
+      {/* Depot de fichiers — mis en avant : c'est ce qui permet une vraie pre-estimation */}
+      <div className="rounded-xl border-2 border-dashed border-gold-300 bg-gold-50/40 p-4">
+        <label htmlFor="fichiers" className="block cursor-pointer">
+          <span className="block font-medium text-ink-900">
+            Ajoutez des photos, un certificat ou une vidéo
+          </span>
+          <span className="mt-1 block text-sm text-ink-600">
+            C’est ce qui nous permet de vous donner une fourchette de prix fiable dès le premier
+            échange. Photos du bijou, du poinçon, du certificat (GIA, HRD, IGI) — même prises au
+            téléphone.
+          </span>
+          <input
+            id="fichiers"
+            name="fichiers"
+            type="file"
+            multiple
+            accept="image/*,.heic,.heif,application/pdf,video/mp4,video/quicktime,.mov"
+            onChange={onFichiers}
+            className="mt-3 block w-full text-sm text-ink-700 file:mr-3 file:rounded-md file:border-0 file:bg-gold-500 file:px-4 file:py-2 file:text-white file:font-medium hover:file:bg-gold-600 file:cursor-pointer"
+          />
+        </label>
+        {fichiersInfo && (
+          <p className={`mt-2 text-sm ${fichiersErreur ? 'text-red-700' : 'text-ink-600'}`}>{fichiersInfo}</p>
+        )}
+        <p className="mt-2 text-xs text-ink-500">
+          Jusqu’à 6 fichiers, 8 Mo chacun. Formats acceptés : photos, PDF, vidéos.
+        </p>
+      </div>
 
       <Field label="Décrivez votre pièce *" htmlFor="message" error={state.errors?.message}>
         <textarea id="message" name="message" required className="textarea" placeholder="Décrivez votre bijou : caractéristiques, état, photos disponibles, etc." />
